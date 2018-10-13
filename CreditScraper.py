@@ -88,7 +88,8 @@ this function runs all the scrapers at once and generates a CSV file
 
 
 def scraper():
-    companies = [ISRACARD_STR, LEUMI_STR, CAL_STR,AMERICANEXPRESS_STR]
+    companies = [ISRACARD_STR, LEUMI_STR, CAL_STR, AMERICANEXPRESS_STR]
+    # companies = [ISRACARD_STR]
     with open('benefits.csv', 'wb') as csvfile:
         writer = csv.writer(csvfile)
         benefits = {}
@@ -136,7 +137,7 @@ def webdriver_unit(debugging=False):
     chrome_options = webdriver.ChromeOptions()
     if not debugging:
         chrome_options.add_argument("--headless")
-    driver = webdriver.Chrome("C:/Users/Snir/Downloads/chromedriver_win32/chromedriver.exe", options=chrome_options)
+    driver = webdriver.Chrome(options=chrome_options)
     return driver
 
 
@@ -148,16 +149,19 @@ def isracard_scraper(benefits):
         try:
             more_benefits = driver.find_element_by_xpath('//*[@id="showMoreHotBenefits"]')
             more_benefits.click()
+        except NoSuchElementException:
+            continue
+        except TimeoutException:
+            return
+        except ElementNotVisibleException:
+            continue
+        finally:
             soup = BeautifulSoup(driver.page_source, HTML_PARSER)
             for benefit in soup.findAll(H1, attrs={CLASS: 'f14'}):
                 title = benefit.text.strip()
                 desc = benefit.findNext(P_STR, attrs={CLASS: 'f13'}).text.strip()
                 benefits[(ISRACARD_STR + ": " + subject, str(i) + ". " + title)] = desc
                 i += 1
-        except NoSuchElementException:
-            continue
-        except TimeoutException:
-            return
 
 
 def leumi_scraper(benefits):
@@ -167,19 +171,25 @@ def leumi_scraper(benefits):
     for subject, url in URLS_LEUMI.items():
         driver.get(url)
         try:
-            next_page = driver.find_element_by_xpath('//*[@id="divPager"]/ul/li[12]')
             while True:
+                next_page = driver.find_elements_by_xpath('//*[@id="divPager"]/ul/li')[-1]
                 soup = BeautifulSoup(driver.page_source, HTML_PARSER)
                 for benefit in soup.findAll(DIV, attrs={CLASS: 'linkWapper'}):
                     title = benefit.findNext(SPAN)
                     desc = benefit.findNext(P_STR)
                     benefits[(LEUMI_STR + ": " + subject, str(i) + ". " + title.text.strip())] = desc.text.strip()
                     i += 1
+                if next_page.get_attribute(CLASS) != 'gcpPage left':
+                    break
                 next_page.click()
                 time.sleep(1)
-                next_page = driver.find_element_by_xpath('//*[@id="divPager"]/ul/li[13]')
-        except NoSuchElementException:
-            continue
+        except IndexError:
+            soup = BeautifulSoup(driver.page_source, HTML_PARSER)
+            for benefit in soup.findAll(DIV, attrs={CLASS: 'linkWapper'}):
+                title = benefit.findNext(SPAN)
+                desc = benefit.findNext(P_STR)
+                benefits[(LEUMI_STR + ": " + subject, str(i) + ". " + title.text.strip())] = desc.text.strip()
+                i += 1
         except TimeoutException:
             return
 
@@ -205,13 +215,12 @@ def cal_scraper(benefits):
 
 
 def americanexpress_scraper(benefits):
-    chrome_options = webdriver.ChromeOptions()
-    # chrome_options.add_argument("--headless")
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = webdriver_unit()
     driver.get(URL_AMERICANEXPRESS)
-    XPATH = '//*[@id="ctl00_MainPlaceHolder_ctlBenefitSearch_divSearchFilterCards"]/div[2]'
+    XPATH = '//*[@id="ctl00_MainPlaceHolder_ctlBenefitSearch_divSearchFilterCards"]/div[2]/a'
     all_button = driver.find_element_by_xpath(XPATH)
     all_button.click()
+    time.sleep(1)
     i = 1
     page_number = 1
     try:
@@ -223,10 +232,19 @@ def americanexpress_scraper(benefits):
                 benefits[(AMERICANEXPRESS_STR, i)] = desc
                 i += 1
             page_number += 1
-            next_page_button = driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder_ctlBenefitSearch_divSearchContent"]/div[23]/span['+str(page_number)+']/a')
+            next_page_xpath = '//*[@id="ctl00_MainPlaceHolder_ctlBenefitSearch_divSearchContent"]/div[23]/span[' + str(
+                page_number) + ']/a'
+            # WebDriverWait(driver, 3).until(EC.presence_of_element_located(By.XPATH, next_page_xpath))
+            next_page_button = driver.find_element_by_xpath(next_page_xpath)
             next_page_button.click()
+            time.sleep(1)
     except NoSuchElementException:
         return
+    except StaleElementReferenceException:
+        return
+    except ElementNotVisibleException:
+        return
+
 
 if __name__ == '__main__':
     scraper()
