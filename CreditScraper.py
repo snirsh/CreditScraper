@@ -89,8 +89,8 @@ this function runs all the scrapers at once and generates a CSV file
 
 
 def scraper():
-    # companies = [ISRACARD_STR, LEUMI_STR, CAL_CASHBACK_STR, AMERICANEXPRESS_STR]
-    companies = [CAL_STR]
+    companies = [ISRACARD_STR, LEUMI_STR, CAL_CASHBACK_STR, AMERICANEXPRESS_STR]
+    # companies = [CAL_STR]
     with open('benefits.csv', 'wb') as csvfile:
         writer = csv.writer(csvfile)
         benefits = {}
@@ -255,7 +255,6 @@ def cal_scraper(benefits):
     SELECTOR_XPATH = '//*[@id="Category_listbox"]/li[28]/a'
     ALL_XPATH = '//*[@id="Category.0"]'
     selector = driver.find_elements_by_xpath(SELECTOR_XPATH)
-
     pass
 
 
