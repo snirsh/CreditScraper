@@ -97,6 +97,7 @@ def scraper():
         for company in companies:
             scrape_by_name(company, benefits)
             print('Finished the current scrape, current number of benefits: ' + str(len(benefits))+'\n')
+        print('Finished scraping, now Starting to write to CSV a total of '+str(len(benefits))+'.')
         for key, value in benefits.items():
             try:
                 writer.writerow([str(key[0]), str(key[1]), str(value)])
