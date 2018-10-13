@@ -96,6 +96,7 @@ def scraper():
         benefits = {}
         for company in companies:
             scrape_by_name(company, benefits)
+            print('Finished the current scrape, current number of benefits: ' + str(len(benefits))+'\n')
         for key, value in benefits.items():
             try:
                 writer.writerow([str(key[0]), str(key[1]), str(value)])
@@ -112,14 +113,19 @@ this function scrapes by name
 
 def scrape_by_name(name, benefits):
     if name == ISRACARD_STR:
+        print('Starting Isracard Scraping\n')
         return isracard_scraper(benefits)
     if name == LEUMI_STR:
+        print('Starting Leumi-Card Scraping\n')
         return leumi_scraper(benefits)
     if name == CAL_CASHBACK_STR:
+        print('Starting Cal-Cashback Scraping\n')
         return cal_cashback_scraper(benefits)
     if name == AMERICANEXPRESS_STR:
+        print('Starting Amex Scraping\n')
         return americanexpress_scraper(benefits)
     if name == CAL_STR:
+        print('Starting Cal Scraping\n')
         return cal_scraper(benefits)
 
 
@@ -147,7 +153,10 @@ def webdriver_unit(debugging=False):
 def isracard_scraper(benefits):
     driver = webdriver_unit()
     i = 1
+    url_num = 0
     for subject, URL in URLS_ISRACARD.items():
+        url_num += 1
+        print('Current URL: ' + str(url_num) + ' out of ' + str(len(URLS_ISRACARD)) + '\n')
         driver.get(URL)
         try:
             more_benefits = driver.find_element_by_xpath('//*[@id="showMoreHotBenefits"]')
@@ -169,9 +178,13 @@ def isracard_scraper(benefits):
 
 def leumi_scraper(benefits):
     leumi_payback_scraper(benefits)  # Payback site
+    print('Finished Leumi Payback\n')
     i = 1
     driver = webdriver_unit()
+    url_num = 0
     for subject, url in URLS_LEUMI.items():
+        url_num += 1
+        print('Current URL: '+str(url_num) + ' out of ' + str(len(URLS_LEUMI)) + '\n')
         driver.get(url)
         try:
             while True:
@@ -198,6 +211,7 @@ def leumi_scraper(benefits):
 
 
 def leumi_payback_scraper(benefits):
+    print('Started Leumi payback...\t')
     soup = scraping_unit(URL_PAYBACK)
     i = 1
     for benefit in soup.findAll(DIV, attrs={CLASS: 'slider'}):
