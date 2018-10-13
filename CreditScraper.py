@@ -255,6 +255,7 @@ def cal_scraper(benefits):
     SELECTOR_XPATH = '//*[@id="Category_listbox"]/li[28]/a'
     ALL_XPATH = '//*[@id="Category.0"]'
     selector = driver.find_elements_by_xpath(SELECTOR_XPATH)
+
     pass
 
 
