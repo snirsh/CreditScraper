@@ -9,12 +9,14 @@ from bs4 import BeautifulSoup
 import unicodecsv as csv
 from urllib.request import build_opener
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException, WebDriverException
+from selenium.common.exceptions import NoSuchElementException, WebDriverException, ElementNotVisibleException, \
+    StaleElementReferenceException
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 import requests
+from selenium.webdriver.support.select import Select
 
 ########################################################################################################################
 ####                                             URLS                                                               ####
@@ -27,17 +29,35 @@ URL_ISRACARD_ATTRACTIONS = 'https://www1.isracard.co.il/attractions'
 URL_ISRACARD_FASHION = 'https://www1.isracard.co.il/2fashion'
 URL_ISRACARD_COOK = 'https://www1.isracard.co.il/cook'
 URL_ISRACARD_PARENTS = 'https://www1.isracard.co.il/parents'
-URL_ISRACARD_LOCAL = 'https://www1.isracard.co.il/start/Pages1/IsraLocal/'
-URLS_ISRACARD = [URL_ISRACARD_ATTRACTIONS, URL_ISRACARD_COOK, URL_ISRACARD_FASHION, URL_ISRACARD_HOME,
-                 URL_ISRACARD_MOREGIFTS, URL_ISRACARD_PARENTS, URL_ISRACARD_LOCAL]
-URL_LEUMI = 'https://www.leumi-card.co.il/he-il/Benefits/Pages/BenfitsGallery.aspx'
+URL_ISRACARD_TRAVELS = 'https://www1.isracard.co.il/travels'
+URL_ISRACARD_ART = 'https://www1.isracard.co.il/art'
+URLS_ISRACARD = {'אטרקציות': URL_ISRACARD_ATTRACTIONS, 'עיצוב ומוצרים לבית': URL_ISRACARD_HOME,
+                 'עוד הפתעות': URL_ISRACARD_MOREGIFTS, 'אופנה': URL_ISRACARD_FASHION, 'אוכל': URL_ISRACARD_COOK,
+                 'הורים וילדים': URL_ISRACARD_PARENTS, 'טיולים': URL_ISRACARD_TRAVELS, 'תרבות': URL_ISRACARD_ART}
+
+URL_LEUMI_MOVIES = 'https://www.leumi-card.co.il/he-il/Benefits/BenefitsPlus/Movies/Pages/MoviesGallery.aspx?sourceGA=AllBenefitsBox'
+URL_LEUMI_ENTERTAINMENT = 'https://www.leumi-card.co.il/he-il/Benefits/Pages/Entertainment.aspx?sourceGA=AllBenefitsBox'
+URL_LEUMI_ATTRACTIONS = 'https://www.leumi-card.co.il/he-il/Benefits/Pages/atractions.aspx?sourceGA=AllBenefitsBox'
+URL_LEUMI_RESTAURATNS = 'https://www.leumi-card.co.il/he-il/Benefits/Pages/rest.aspx?sourceGA=AllBenefitsBox'
+URL_LEUMI_LEISURE = 'https://www.leumi-card.co.il/he-il/Benefits/Pages/Leisure.aspx?sourceGA=AllBenefitsBox'
+URL_LEUMI_KIDS = 'https://www.leumi-card.co.il/he-il/Benefits/Pages/Kids.aspx?sourceGA=AllBenefitsBox'
+URL_LEUMI_DAILY = 'https://www.leumi-card.co.il/he-il/Benefits/DailyBenefits/Pages/DailyBenefitsGallery.aspx?sourceGA=AllBenefitsBox'
+URL_LEUMI_DISCOUNTS = 'https://www.leumi-card.co.il/he-il/Benefits/LeumiCard/discounts/Pages/DisPlus.aspx?sourceGA=AllBenefitsBox'
+URLS_LEUMI = {'סרטים': URL_LEUMI_MOVIES, 'מופעים והצגות': URL_LEUMI_ENTERTAINMENT,
+              'אטרקציות': URL_LEUMI_ATTRACTIONS, 'מסעדות': URL_LEUMI_RESTAURATNS, 'נופש ופנאי': URL_LEUMI_LEISURE,
+              'ילדים': URL_LEUMI_KIDS,
+              'פינוק היום': URL_LEUMI_DAILY, 'הנחות': URL_LEUMI_DISCOUNTS}
+URL_PAYBACK = 'https://www.pay-back.co.il/category/all'
+
 URL_CAL = 'https://cashback-plus.co.il/stores/all-stores/'
 URL_AMERICANEXPRESS = 'https://rewards.americanexpress.co.il/'
+
 ########################################################################################################################
 ####                                        COMPANY NAMES                                                           ####
 ########################################################################################################################
 ISRACARD_STR = 'Isracard'
 LEUMI_STR = 'Leumi Card'
+LEUMI_PAYBACK_STR = 'Leumi Payback'
 CAL_STR = 'CalCashBack'
 AMERICANEXPRESS_STR = 'American Express'
 ########################################################################################################################
@@ -68,8 +88,7 @@ this function runs all the scrapers at once and generates a CSV file
 
 
 def scraper():
-    # companies = [ISRACARD_STR, LEUMI_STR, CAL_STR,AMERICANEXPRESS_STR]
-    companies = [AMERICANEXPRESS_STR]
+    companies = [ISRACARD_STR, LEUMI_STR, CAL_STR,AMERICANEXPRESS_STR]
     with open('benefits.csv', 'wb') as csvfile:
         writer = csv.writer(csvfile)
         benefits = {}
@@ -113,63 +132,76 @@ def scraping_unit(page_url):
     return soup
 
 
-def requests_unit(page_url, host, origin, referer, data):
-    session = requests.Session()
-    session.get(url=page_url, allow_redirects=True)
-    headers = {
-        "Connection": "keep-alive",
-        "Cache-Control": "no-cache",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36",
-        "Host": host,
-        "Origin": origin,
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "*/*",
-        "Referer": referer,
-        "Accept-Encoding": "gzip, deflate, br",
-        "Accept-Language": "en-US,en;q=0.9,he;q=0.8,fr;q=0.7",
-        "X-MicrosoftAjax": "Delta=true",
-        "X-Requested-With": "XMLHttpRequest"}
-    response = session.post(url=url, data=data, headers=headers, allow_redirects=True)
-    print(response.text)
+def webdriver_unit(debugging=False):
+    chrome_options = webdriver.ChromeOptions()
+    if not debugging:
+        chrome_options.add_argument("--headless")
+    driver = webdriver.Chrome("C:/Users/Snir/Downloads/chromedriver_win32/chromedriver.exe", options=chrome_options)
+    return driver
 
 
 def isracard_scraper(benefits):
-    for URL in URLS_ISRACARD:
-        soup = scraping_unit(URL)
-        for benefit in soup.findAll(DIV, attrs={CLASS: 'benefotTab-info'}):
-            title = benefit.findNext(H3, attrs={CLASS: 'f14'})
-            desc = benefit.findNext(P_STR, attrs={CLASS: 'f13'})
-            benefits[(ISRACARD_STR, title.text.strip())] = desc.text.strip()
+    driver = webdriver_unit()
+    i = 1
+    for subject, URL in URLS_ISRACARD.items():
+        driver.get(URL)
+        try:
+            more_benefits = driver.find_element_by_xpath('//*[@id="showMoreHotBenefits"]')
+            more_benefits.click()
+            soup = BeautifulSoup(driver.page_source, HTML_PARSER)
+            for benefit in soup.findAll(H1, attrs={CLASS: 'f14'}):
+                title = benefit.text.strip()
+                desc = benefit.findNext(P_STR, attrs={CLASS: 'f13'}).text.strip()
+                benefits[(ISRACARD_STR + ": " + subject, str(i) + ". " + title)] = desc
+                i += 1
+        except NoSuchElementException:
+            continue
+        except TimeoutException:
+            return
 
 
 def leumi_scraper(benefits):
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument("--headless")
-    driver = webdriver.Chrome(options=chrome_options)
-    # driver.set_window_size(1000, 800)
-    driver.get(URL_LEUMI)
-    try:
-        while True:
-            soup = BeautifulSoup(driver.page_source, HTML_PARSER)
-            for benefit in soup.findAll(DIV, attrs={CLASS: 'linkWapper'}):
-                title = benefit.findNext(SPAN)
-                desc = benefit.findNext(P_STR)
-                benefits[(LEUMI_STR, title.text.strip())] = desc.text.strip()
-            WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.XPATH, '//*[@id="divPager"]/ul/li[12]')))
+    leumi_payback_scraper(benefits)  # Payback site
+    i = 1
+    driver = webdriver_unit()
+    for subject, url in URLS_LEUMI.items():
+        driver.get(url)
+        try:
             next_page = driver.find_element_by_xpath('//*[@id="divPager"]/ul/li[12]')
-            next_page.click()
-    except NoSuchElementException:
-        return
-    except TimeoutException:
-        return
+            while True:
+                soup = BeautifulSoup(driver.page_source, HTML_PARSER)
+                for benefit in soup.findAll(DIV, attrs={CLASS: 'linkWapper'}):
+                    title = benefit.findNext(SPAN)
+                    desc = benefit.findNext(P_STR)
+                    benefits[(LEUMI_STR + ": " + subject, str(i) + ". " + title.text.strip())] = desc.text.strip()
+                    i += 1
+                next_page.click()
+                time.sleep(1)
+                next_page = driver.find_element_by_xpath('//*[@id="divPager"]/ul/li[13]')
+        except NoSuchElementException:
+            continue
+        except TimeoutException:
+            return
+
+
+def leumi_payback_scraper(benefits):
+    soup = scraping_unit(URL_PAYBACK)
+    i = 1
+    for benefit in soup.findAll(DIV, attrs={CLASS: 'slider'}):
+        title = benefit.findNext(DIV).text
+        desc = benefit.findNext(H4)
+        benefits[(LEUMI_STR, str(i) + ". " + title)] = desc
+        i += 1
 
 
 def cal_scraper(benefits):
     soup = scraping_unit(URL_CAL)
+    i = 1
     for benefit in soup.findAll(SPAN, attrs={CLASS: 'sr-only'}):
         title = benefit
         desc = benefit.findNext(H1, attrs={CLASS: 'h4 bold'})
         benefits[(CAL_STR, title.text.strip())] = desc.text.strip()
+        i += 1
 
 
 def americanexpress_scraper(benefits):
@@ -180,7 +212,6 @@ def americanexpress_scraper(benefits):
     XPATH = '//*[@id="ctl00_MainPlaceHolder_ctlBenefitSearch_divSearchFilterCards"]/div[2]'
     all_button = driver.find_element_by_xpath(XPATH)
     all_button.click()
-    all_button.send_keys(' ')
     i = 1
     page_number = 1
     try:
