@@ -2,6 +2,7 @@
 ####                                           IMPORTS                                                              ####
 ########################################################################################################################
 import sys
+import time
 from urllib.request import urlopen
 from urllib import error
 from bs4 import BeautifulSoup
@@ -18,6 +19,8 @@ import requests
 ########################################################################################################################
 ####                                             URLS                                                               ####
 ########################################################################################################################
+from urllib3.util import wait
+
 URL_ISRACARD_HOME = 'https://www1.isracard.co.il/home'
 URL_ISRACARD_MOREGIFTS = 'https://www1.isracard.co.il/moregits'
 URL_ISRACARD_ATTRACTIONS = 'https://www1.isracard.co.il/attractions'
@@ -29,12 +32,14 @@ URLS_ISRACARD = [URL_ISRACARD_ATTRACTIONS, URL_ISRACARD_COOK, URL_ISRACARD_FASHI
                  URL_ISRACARD_MOREGIFTS, URL_ISRACARD_PARENTS, URL_ISRACARD_LOCAL]
 URL_LEUMI = 'https://www.leumi-card.co.il/he-il/Benefits/Pages/BenfitsGallery.aspx'
 URL_CAL = 'https://cashback-plus.co.il/stores/all-stores/'
+URL_AMERICANEXPRESS = 'https://rewards.americanexpress.co.il/'
 ########################################################################################################################
 ####                                        COMPANY NAMES                                                           ####
 ########################################################################################################################
 ISRACARD_STR = 'Isracard'
 LEUMI_STR = 'Leumi Card'
 CAL_STR = 'CalCashBack'
+AMERICANEXPRESS_STR = 'American Express'
 ########################################################################################################################
 ####                                           CONSTANTS                                                            ####
 ########################################################################################################################
@@ -63,7 +68,8 @@ this function runs all the scrapers at once and generates a CSV file
 
 
 def scraper():
-    companies = [ISRACARD_STR, LEUMI_STR, CAL_STR]
+    # companies = [ISRACARD_STR, LEUMI_STR, CAL_STR,AMERICANEXPRESS_STR]
+    companies = [AMERICANEXPRESS_STR]
     with open('benefits.csv', 'wb') as csvfile:
         writer = csv.writer(csvfile)
         benefits = {}
@@ -90,6 +96,9 @@ def scrape_by_name(name, benefits):
         return leumi_scraper(benefits)
     if name == CAL_STR:
         return cal_scraper(benefits)
+    if name == AMERICANEXPRESS_STR:
+        return americanexpress_scraper(benefits)
+
 
 def scraping_unit(page_url):
     try:
@@ -136,8 +145,8 @@ def isracard_scraper(benefits):
 def leumi_scraper(benefits):
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--headless")
-    driver = webdriver.Chrome("C:/Users/Snir/Downloads/chromedriver_win32/chromedriver.exe", options=chrome_options)
-    driver.set_window_size(1000, 800)
+    driver = webdriver.Chrome(options=chrome_options)
+    # driver.set_window_size(1000, 800)
     driver.get(URL_LEUMI)
     try:
         while True:
@@ -162,6 +171,31 @@ def cal_scraper(benefits):
         desc = benefit.findNext(H1, attrs={CLASS: 'h4 bold'})
         benefits[(CAL_STR, title.text.strip())] = desc.text.strip()
 
+
+def americanexpress_scraper(benefits):
+    chrome_options = webdriver.ChromeOptions()
+    # chrome_options.add_argument("--headless")
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.get(URL_AMERICANEXPRESS)
+    XPATH = '//*[@id="ctl00_MainPlaceHolder_ctlBenefitSearch_divSearchFilterCards"]/div[2]'
+    all_button = driver.find_element_by_xpath(XPATH)
+    all_button.click()
+    all_button.send_keys(' ')
+    i = 1
+    page_number = 1
+    try:
+        while True:
+            soup = BeautifulSoup(driver.page_source, HTML_PARSER)
+            for benefit in soup.findAll('div', attrs={'class': 'SearchSimpleImageTitle'}):
+                title = benefit.text
+                desc = title
+                benefits[(AMERICANEXPRESS_STR, i)] = desc
+                i += 1
+            page_number += 1
+            next_page_button = driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder_ctlBenefitSearch_divSearchContent"]/div[23]/span['+str(page_number)+']/a')
+            next_page_button.click()
+    except NoSuchElementException:
+        return
 
 if __name__ == '__main__':
     scraper()
