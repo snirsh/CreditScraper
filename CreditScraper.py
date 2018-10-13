@@ -49,17 +49,18 @@ URLS_LEUMI = {'סרטים': URL_LEUMI_MOVIES, 'מופעים והצגות': URL_L
               'פינוק היום': URL_LEUMI_DAILY, 'הנחות': URL_LEUMI_DISCOUNTS}
 URL_PAYBACK = 'https://www.pay-back.co.il/category/all'
 
-URL_CAL = 'https://cashback-plus.co.il/stores/all-stores/'
+URL_CAL_CASHBACK = 'https://cashback-plus.co.il/stores/all-stores/'
 URL_AMERICANEXPRESS = 'https://rewards.americanexpress.co.il/'
-
+URL_CAL = 'https://www.callatet.co.il/BuildaGate5/general2/company_search_tree.php?NewNameMade=5868&SiteName=takti'
 ########################################################################################################################
 ####                                        COMPANY NAMES                                                           ####
 ########################################################################################################################
 ISRACARD_STR = 'Isracard'
 LEUMI_STR = 'Leumi Card'
 LEUMI_PAYBACK_STR = 'Leumi Payback'
-CAL_STR = 'CalCashBack'
+CAL_CASHBACK_STR = 'CalCashBack'
 AMERICANEXPRESS_STR = 'American Express'
+CAL_STR = 'Cal'
 ########################################################################################################################
 ####                                           CONSTANTS                                                            ####
 ########################################################################################################################
@@ -88,8 +89,8 @@ this function runs all the scrapers at once and generates a CSV file
 
 
 def scraper():
-    companies = [ISRACARD_STR, LEUMI_STR, CAL_STR, AMERICANEXPRESS_STR]
-    # companies = [ISRACARD_STR]
+    # companies = [ISRACARD_STR, LEUMI_STR, CAL_CASHBACK_STR, AMERICANEXPRESS_STR]
+    companies = [CAL_STR]
     with open('benefits.csv', 'wb') as csvfile:
         writer = csv.writer(csvfile)
         benefits = {}
@@ -114,10 +115,12 @@ def scrape_by_name(name, benefits):
         return isracard_scraper(benefits)
     if name == LEUMI_STR:
         return leumi_scraper(benefits)
-    if name == CAL_STR:
-        return cal_scraper(benefits)
+    if name == CAL_CASHBACK_STR:
+        return cal_cashback_scraper(benefits)
     if name == AMERICANEXPRESS_STR:
         return americanexpress_scraper(benefits)
+    if name == CAL_STR:
+        return cal_scraper(benefits)
 
 
 def scraping_unit(page_url):
@@ -204,13 +207,13 @@ def leumi_payback_scraper(benefits):
         i += 1
 
 
-def cal_scraper(benefits):
-    soup = scraping_unit(URL_CAL)
+def cal_cashback_scraper(benefits):
+    soup = scraping_unit(URL_CAL_CASHBACK)
     i = 1
     for benefit in soup.findAll(SPAN, attrs={CLASS: 'sr-only'}):
         title = benefit
         desc = benefit.findNext(H1, attrs={CLASS: 'h4 bold'})
-        benefits[(CAL_STR, title.text.strip())] = desc.text.strip()
+        benefits[(CAL_CASHBACK_STR, title.text.strip())] = desc.text.strip()
         i += 1
 
 
@@ -244,6 +247,15 @@ def americanexpress_scraper(benefits):
         return
     except ElementNotVisibleException:
         return
+
+
+def cal_scraper(benefits):
+    driver = webdriver_unit(True)
+    driver.get(URL_CAL)
+    SELECTOR_XPATH = '//*[@id="Category_listbox"]/li[28]/a'
+    ALL_XPATH = '//*[@id="Category.0"]'
+    selector = driver.find_elements_by_xpath(SELECTOR_XPATH)
+    pass
 
 
 if __name__ == '__main__':
