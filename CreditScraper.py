@@ -5,6 +5,8 @@ import sys
 import time
 from urllib.request import urlopen
 from urllib import error
+
+from airtable import Airtable
 from bs4 import BeautifulSoup
 import unicodecsv as csv
 from urllib.request import build_opener
@@ -89,22 +91,34 @@ this function runs all the scrapers at once and generates a CSV file
 
 
 def scraper():
-    companies = [ISRACARD_STR, LEUMI_STR, CAL_CASHBACK_STR, AMERICANEXPRESS_STR]
-    # companies = [CAL_STR]
-    with open('benefits.csv', 'wb') as csvfile:
-        writer = csv.writer(csvfile)
-        benefits = {}
-        for company in companies:
-            scrape_by_name(company, benefits)
-            print('Finished the current scrape, current number of benefits: ' + str(len(benefits))+'\n')
-        print('Finished scraping, now Starting to write to CSV a total of '+str(len(benefits))+'.')
+    # companies = [ISRACARD_STR, LEUMI_STR, CAL_CASHBACK_STR, AMERICANEXPRESS_STR]
+    companies = [ISRACARD_STR]
+    print('Started scraping:\n')
+    benefits = {}
+    for company in companies:
+        print('Started scraping ' + company + '.\n')
+        scrape_by_name(company, benefits)
+    print('Finished the current scrape, current number of benefits: ' + str(len(benefits)) + '\n')
+    question = input("Press 0 for CSV and 1 for Airtable \t")
+    if question == str(0):
+        with open('benefits.csv', 'wb') as csvfile:
+            writer = csv.writer(csvfile)
+            print('Finished scraping, now Starting to write to CSV a total of ' + str(len(benefits)) + '.')
+            for key, value in benefits.items():
+                try:
+                    writer.writerow([str(key[0]), str(key[1]), str(value)])
+                except csv.Error:
+                    print('CSV writing error', sys.exc_info()[0])
+                    raise
+            csvfile.close()
+    elif question == str(1):
+        print("Updating airtable")
+        airtable = Airtable('app4iqBeamg7ClHPS', 'Benefits', api_key='keyaVQTgUd3hczqsE')
+        benefit_str = 'Benefit'
+        company_str = 'Company'
+        description_str = 'Benefit description'
         for key, value in benefits.items():
-            try:
-                writer.writerow([str(key[0]), str(key[1]), str(value)])
-            except csv.Error:
-                print('CSV writing error', sys.exc_info()[0])
-                raise
-        csvfile.close()
+            airtable.insert({benefit_str: key[1], company_str: key[0], description_str: value})
 
 
 """
@@ -114,19 +128,14 @@ this function scrapes by name
 
 def scrape_by_name(name, benefits):
     if name == ISRACARD_STR:
-        print('Starting Isracard Scraping\n')
         return isracard_scraper(benefits)
     if name == LEUMI_STR:
-        print('Starting Leumi-Card Scraping\n')
         return leumi_scraper(benefits)
     if name == CAL_CASHBACK_STR:
-        print('Starting Cal-Cashback Scraping\n')
         return cal_cashback_scraper(benefits)
     if name == AMERICANEXPRESS_STR:
-        print('Starting Amex Scraping\n')
         return americanexpress_scraper(benefits)
     if name == CAL_STR:
-        print('Starting Cal Scraping\n')
         return cal_scraper(benefits)
 
 
@@ -157,7 +166,9 @@ def isracard_scraper(benefits):
     url_num = 0
     for subject, URL in URLS_ISRACARD.items():
         url_num += 1
-        print('Current URL: ' + str(url_num) + ' out of ' + str(len(URLS_ISRACARD)) + '\n')
+        print('Current URL: ' + str(url_num) + ' out of ' + str(len(URLS_ISRACARD)))
+        if url_num == len(URLS_ISRACARD):
+            print('\n')
         driver.get(URL)
         try:
             more_benefits = driver.find_element_by_xpath('//*[@id="showMoreHotBenefits"]')
@@ -179,13 +190,14 @@ def isracard_scraper(benefits):
 
 def leumi_scraper(benefits):
     leumi_payback_scraper(benefits)  # Payback site
-    print('Finished Leumi Payback\n')
     i = 1
     driver = webdriver_unit()
     url_num = 0
     for subject, url in URLS_LEUMI.items():
         url_num += 1
-        print('Current URL: '+str(url_num) + ' out of ' + str(len(URLS_LEUMI)) + '\n')
+        print('Current URL: ' + str(url_num) + ' out of ' + str(len(URLS_LEUMI)))
+        if url_num == len(URLS_LEUMI):
+            print('\n')
         driver.get(url)
         try:
             while True:
@@ -212,7 +224,6 @@ def leumi_scraper(benefits):
 
 
 def leumi_payback_scraper(benefits):
-    print('Started Leumi payback...\t')
     soup = scraping_unit(URL_PAYBACK)
     i = 1
     for benefit in soup.findAll(DIV, attrs={CLASS: 'slider'}):
@@ -247,7 +258,7 @@ def americanexpress_scraper(benefits):
             for benefit in soup.findAll('div', attrs={'class': 'SearchSimpleImageTitle'}):
                 title = benefit.text
                 desc = title
-                benefits[(AMERICANEXPRESS_STR, i)] = desc
+                benefits[(AMERICANEXPRESS_STR, str(i) + '. ')] = desc
                 i += 1
             page_number += 1
             next_page_xpath = '//*[@id="ctl00_MainPlaceHolder_ctlBenefitSearch_divSearchContent"]/div[23]/span[' + str(
